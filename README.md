@@ -1,5 +1,19 @@
 # The Wedding Invitation
 
+This is a wedding invitation web application built with Laravel. It allows you to create personalized wedding invitations for your guests, manage RSVPs, and view guest responses through an admin panel.
+
+# 🌟 Features:
+1. Admin panel to manage website content
+2. Sections: Hero, Mempelai, Acara, Gallery, Ucapan (RSVP), Hadiah
+    - Hero section: countdown to the wedding day, background photos
+    - Mempelai section: Quranic verses, photos and brief descriptions of the couple with their social media
+    - Acara section: event details, wedding location address integrated with location maps (Google Maps) and Google Calendar
+    - Gallery section: collection of pre-wedding photos
+    - Ucapan (RSVP) section: form to send congratulations messages
+    - Hadiah section: gift address and couple's bank account information
+3. Responsive design for accessibility across various devices (desktop, tablet, mobile)
+4. SEO optimization to improve visibility in search engines
+
 ## Local Installation
 
 ### Setup this repository first
@@ -45,7 +59,7 @@ php artisan serve
 ### Usage
 
 - Landing page with guest name: http://127.0.0.1:8000/?to=deankt
-- Admin login: http://127.0.0.1:8000/admin
+- Admin login: http://127.0.0.1:8000/adminpanel
 
 ## Deployment on Server
 
@@ -184,7 +198,7 @@ sudo systemctl restart php8.3-fpm
 
 - Main page: http://SERVER-IP
 - With guest name: http://SERVER-IP/?to=deankt
-- Admin login: http://SERVER-IP/admin
+- Admin login: http://SERVER-IP/adminpanel
 
 ## Troubleshooting
 
