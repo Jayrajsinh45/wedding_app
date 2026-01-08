@@ -119,9 +119,6 @@ jobs:
           rm -f package-lock.json
           rm -f .env
           rm -f phpunit.xml
-          rm -f vite.config.js
-          rm -f postcss.config.js
-          rm -f tailwind.config.js
           echo "✅ Development files removed"
       
       - name: 📦 Create Production ZIP
