@@ -1,0 +1,177 @@
+name: Quick Build & Download
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-package:
+    name: Build Production Package
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v3
+      
+      - name: 🐘 Setup PHP 8.3
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, xml, ctype, iconv, intl, pdo_mysql, dom, filter, gd, json, bcmath, fileinfo, tokenizer
+          tools: composer:v2
+      
+      - name: 📦 Setup Node.js 18
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+      
+      - name: 🔧 Install PHP Dependencies
+        run: |
+          composer install --no-dev --optimize-autoloader --no-interaction
+          echo "✅ Composer dependencies installed"
+      
+      - name: 🔧 Install Node Dependencies
+        run: |
+          npm ci
+          echo "✅ NPM dependencies installed"
+      
+      - name: 🏗️ Build Frontend Assets
+        run: |
+          npm run build
+          echo "✅ Assets compiled"
+      
+      - name: 📝 Prepare Production Files
+        run: |
+          # Create necessary directories
+          mkdir -p storage/framework/{cache,sessions,views}
+          mkdir -p storage/logs
+          mkdir -p bootstrap/cache
+          
+          # Set proper permissions
+          chmod -R 775 storage bootstrap/cache
+          
+          # Create production env example
+          cp .env.example .env.production.example
+          
+          # Create deployment instructions
+          cat > INSTALL.txt << 'EOF'
+          ========================================
+          WEDDING INVITATION APP - INSTALLATION
+          ========================================
+          
+          1. UPLOAD FILES
+             - Extract this ZIP to your server
+             - Recommended path: /var/www/wedding-app
+          
+          2. CONFIGURE ENVIRONMENT
+             - Copy .env.production.example to .env
+             - Edit .env with your settings:
+               * Database credentials
+               * APP_URL
+               * APP_KEY (generate with: php artisan key:generate)
+          
+          3. SET PERMISSIONS
+             chmod -R 775 storage bootstrap/cache
+             chown -R www-data:www-data storage bootstrap/cache
+          
+          4. RUN MIGRATIONS
+             php artisan migrate:fresh --seed
+             php artisan storage:link
+          
+          5. CONFIGURE WEB SERVER
+             - Point document root to: public/
+             - See DEPLOYMENT.md for Nginx/Apache config
+          
+          6. ACCESS APPLICATION
+             - Website: http://your-domain.com
+             - Admin: http://your-domain.com/adminpanel
+          
+          For detailed instructions, see DEPLOYMENT.md
+          ========================================
+          EOF
+          
+          # Create build info
+          cat > BUILD_INFO.txt << EOF
+          Build Information
+          =================
+          Build Date: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          Git Commit: ${{ github.sha }}
+          Git Branch: ${{ github.ref_name }}
+          Built By: GitHub Actions
+          Workflow: ${{ github.workflow }}
+          Run Number: ${{ github.run_number }}
+          
+          This is a production-ready build with:
+          ✅ Optimized Composer dependencies (no dev packages)
+          ✅ Compiled frontend assets (CSS, JS)
+          ✅ Production configuration
+          
+          Ready to deploy to your server!
+          EOF
+      
+      - name: 🗑️ Clean Development Files
+        run: |
+          # Remove files not needed in production
+          rm -rf node_modules
+          rm -rf tests
+          rm -f package-lock.json
+          rm -f .env
+          rm -f phpunit.xml
+          rm -f vite.config.js
+          rm -f postcss.config.js
+          rm -f tailwind.config.js
+          echo "✅ Development files removed"
+      
+      - name: 📦 Create Production ZIP
+        run: |
+          cd ..
+          zip -r wedding-app-production.zip the-wedding-invitation \
+            -x "*.git*" \
+            -x "*node_modules*" \
+            -x "*/tests/*" \
+            -x "*.env" \
+            -x "*/.DS_Store"
+          
+          # Get file size
+          SIZE=$(du -h wedding-app-production.zip | cut -f1)
+          echo "📦 Package size: $SIZE"
+          echo "PACKAGE_SIZE=$SIZE" >> $GITHUB_ENV
+          
+          mv wedding-app-production.zip the-wedding-invitation/
+      
+      - name: 📤 Upload Production Build
+        uses: actions/upload-artifact@v3
+        with:
+          name: wedding-app-production-${{ github.run_number }}
+          path: wedding-app-production.zip
+          retention-days: 90
+      
+      - name: 📊 Build Summary
+        run: |
+          echo "## ✅ Build Successful! 🎉" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 Download Your Build" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Your production-ready wedding app is available for download!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Build Details:**" >> $GITHUB_STEP_SUMMARY
+          echo "- 🏷️ Build Number: #${{ github.run_number }}" >> $GITHUB_STEP_SUMMARY
+          echo "- 📅 Build Date: $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔖 Commit: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- 🌿 Branch: \`${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📥 How to Download" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "1. Go to the **Actions** tab" >> $GITHUB_STEP_SUMMARY
+          echo "2. Click on this workflow run" >> $GITHUB_STEP_SUMMARY
+          echo "3. Scroll down to **Artifacts**" >> $GITHUB_STEP_SUMMARY
+          echo "4. Download: \`wedding-app-production-${{ github.run_number }}.zip\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🚀 Next Steps" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "1. Extract the ZIP file on your server" >> $GITHUB_STEP_SUMMARY
+          echo "2. Follow instructions in \`INSTALL.txt\`" >> $GITHUB_STEP_SUMMARY
+          echo "3. Configure your \`.env\` file" >> $GITHUB_STEP_SUMMARY
+          echo "4. Run migrations and enjoy! 🎊" >> $GITHUB_STEP_SUMMARY

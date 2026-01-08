@@ -1,0 +1,113 @@
+name: Build Application Artifact
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, xml, ctype, iconv, intl, pdo_mysql, dom, filter, gd, json, bcmath, fileinfo, tokenizer
+          coverage: none
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+      
+      - name: Get Composer Cache Directory
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+      
+      - name: Cache Composer dependencies
+        uses: actions/cache@v3
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+          restore-keys: ${{ runner.os }}-composer-
+      
+      - name: Install Composer dependencies
+        run: composer install --prefer-dist --no-interaction --no-dev --optimize-autoloader
+      
+      - name: Install NPM dependencies
+        run: npm ci
+      
+      - name: Build frontend assets
+        run: npm run build
+      
+      - name: Create .env.example for production
+        run: |
+          cp .env.example .env.production
+          echo "Build completed successfully"
+      
+      - name: Create storage directories
+        run: |
+          mkdir -p storage/framework/cache
+          mkdir -p storage/framework/sessions
+          mkdir -p storage/framework/views
+          mkdir -p storage/logs
+          mkdir -p bootstrap/cache
+      
+      - name: Set permissions
+        run: |
+          chmod -R 775 storage
+          chmod -R 775 bootstrap/cache
+      
+      - name: Remove development files
+        run: |
+          rm -rf node_modules
+          rm -rf tests
+          rm -rf .git
+          rm -f .env
+          rm -f phpunit.xml
+          rm -f package-lock.json
+      
+      - name: Create build info
+        run: |
+          echo "Build Date: $(date)" > BUILD_INFO.txt
+          echo "Commit: ${{ github.sha }}" >> BUILD_INFO.txt
+          echo "Branch: ${{ github.ref_name }}" >> BUILD_INFO.txt
+          echo "Built by: GitHub Actions" >> BUILD_INFO.txt
+      
+      - name: Create deployment package
+        run: |
+          cd ..
+          zip -r wedding-app-build.zip the-wedding-invitation \
+            -x "*.git*" \
+            -x "*node_modules*" \
+            -x "*tests*" \
+            -x "*.env"
+          mv wedding-app-build.zip the-wedding-invitation/
+      
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: wedding-app-production-build
+          path: wedding-app-build.zip
+          retention-days: 30
+      
+      - name: Create Release (on tag)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: wedding-app-build.zip
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
